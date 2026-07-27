@@ -237,6 +237,103 @@ class TestReviewService:
         mock_db_session.commit.assert_awaited()
 
     @pytest.mark.asyncio
+    async def test_process_review_marks_review_failed_after_pipeline_exception(
+        self, mock_db_session: AsyncMock, mock_review: Mock, mock_profile: Mock
+    ) -> None:
+        """Mark the review failed when a workflow dependency raises unexpectedly."""
+        mock_db_session.execute = AsyncMock(
+            side_effect=[
+                self._build_result(mock_review),
+                self._build_result(mock_profile),
+                self._build_result(mock_review),
+            ]
+        )
+
+        with patch.object(
+            review_service,
+            "_run_ingestion_pipeline",
+            AsyncMock(side_effect=RuntimeError("ingestion unavailable")),
+        ):
+            await review_service.process_review(mock_db_session, mock_review.id, mock_profile.id)
+
+        assert mock_review.status == "failed"
+        assert mock_review.updated_at is not None
+        assert mock_db_session.execute.await_count == 3
+        assert mock_db_session.commit.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_ingestion_pipeline_continues_after_one_source_fails(
+        self, mock_db_session: AsyncMock, mock_profile: Mock
+    ) -> None:
+        """Keep usable sources when storing one ingested source fails."""
+        mock_db_session.add.side_effect = [RuntimeError("GitHub storage unavailable"), None, None]
+
+        with patch.object(review_service, "IngestedSource", Mock()):
+            results = await review_service._run_ingestion_pipeline(mock_db_session, mock_profile)
+
+        assert [source["source_type"] for source in results] == ["github", "portfolio", "resume"]
+        mock_db_session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("failed_source", ["portfolio", "resume"])
+    async def test_ingestion_pipeline_continues_when_later_source_fails(
+        self, mock_db_session: AsyncMock, mock_profile: Mock, failed_source: str
+    ) -> None:
+        """Handle a portfolio or resume ingestion failure without aborting the pipeline."""
+        failure_index = {"portfolio": 1, "resume": 2}[failed_source]
+        mock_db_session.add.side_effect = [
+            RuntimeError("source storage unavailable") if index == failure_index else None
+            for index in range(3)
+        ]
+
+        with patch.object(review_service, "IngestedSource", Mock()):
+            results = await review_service._run_ingestion_pipeline(mock_db_session, mock_profile)
+
+        assert len(results) == 3
+        mock_db_session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_orchestration_and_rag_helpers_return_review_output(
+        self, mock_profile: Mock
+    ) -> None:
+        """Return the default analysis and generated-feedback structures."""
+        sources = [{"source_type": "github"}]
+
+        agent_output = await review_service._run_agent_orchestration(mock_profile, sources)
+        rag_output = await review_service._run_rag_retrieval_generation(
+            mock_profile, sources, agent_output
+        )
+
+        assert agent_output["sections"]
+        assert rag_output["sections"]
+        assert rag_output["overall_score"] == 0.81
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("output", "expected"),
+        [
+            ({"sections": []}, False),
+            (
+                {"sections": [{"section_name": "Skills", "content": "Good", "confidence": 0.8}]},
+                True,
+            ),
+            (
+                {"sections": [{"section_name": "", "content": "Good", "confidence": 0.8}]},
+                False,
+            ),
+            (
+                {"sections": [{"section_name": "Skills", "content": "Good", "confidence": 1.1}]},
+                False,
+            ),
+        ],
+    )
+    async def test_safety_checks_validate_review_sections(
+        self, output: dict[str, Any], expected: bool
+    ) -> None:
+        """Accept complete sections and reject incomplete or invalid output."""
+        assert await review_service._run_safety_checks(output) is expected
+
+    @pytest.mark.asyncio
     async def test_process_review_marks_review_failed_when_profile_is_missing(
         self, mock_db_session: AsyncMock, mock_review: Mock
     ) -> None:
