@@ -17,7 +17,7 @@ The review service is the core workflow for creating and processing portfolio re
 
 ## Week 8 — Reproduction & solution planning
 
-**Reproduction commit link:** https://github.com/Oreo236/pathreview/commit/placeholder
+**Reproduction commit link:** https://github.com/Oreo236/pathreview/commit/91a3dc7c07b5918d45a14ebe66b816d2288966a6
 
 **Reproduction summary:**
 I reproduced the issue by running the review-service unit tests with coverage reporting. The current test run fails and does not provide meaningful coverage for the review workflow, confirming that the service’s main execution paths are not being exercised.
@@ -51,7 +51,7 @@ None at the moment.
 **Branch:** `test/109-review-service-coverage`
 
 **What you built:**
-I added targeted unit tests for the review-service workflow in [tests/unit/test_review_service.py](tests/unit/test_review_service.py). The new tests cover review creation, review lookup, pagination, successful processing, safety-check failure, missing-profile failure, and missing-review early exit.
+I added targeted unit tests for the review-service workflow in [tests/unit/test_review_service.py](tests/unit/test_review_service.py). The new tests cover review creation, review lookup, safety-check failure, missing-profile failure, and missing-review early exit.
 
 **Tests added or updated:**
 Updated [tests/unit/test_review_service.py](tests/unit/test_review_service.py) to cover the main review-service execution paths.
@@ -59,3 +59,34 @@ Updated [tests/unit/test_review_service.py](tests/unit/test_review_service.py) t
 **Self-review confirmation:** [x] make check passes  [ ] make test-unit passes
 
 **Draft PR feedback received from:** none
+
+## Week 10 — Iteration & reflection
+
+### Reviewer feedback
+
+**Feedback received:** [] Yes  [x] No — still awaiting review
+
+**Summary of feedback:**
+No feedback
+
+**How you responded:**
+No changes were needed in response to reviewer feedback.
+
+---
+
+### Reflection
+
+**What was harder than you expected?**
+The hardest part was understanding the service’s intent. It required more careful reading than I expected, especially when the code was working but the edge cases were not clearly documented.
+
+**What did you learn about working in a large codebase?**
+Working in a larger codebase taught me that contribution is about more than making a change that passes locally. It is also about reading surrounding patterns, respecting existing conventions, and making sure a change fits the expectations of the project rather than just solving the immediate problem in an isolated way.
+
+**How did AI tools help — and where did they fall short?**
+AI tools were helpful for quickly suggesting test cases, explaining unfamiliar functions, and helping me think through the service’s likely success and failure paths. They were less reliable when it came to judging whether a test reflected the intended product behavior rather than just the current implementation, so I had to verify the logic by reading the relevant code and aligning the tests with the service’s actual contract.
+
+**What would you do differently if you started over?**
+If I started over, I would map the important execution paths of the service more explicitly before writing tests, so I could focus on the highest-value branches first. I would also spend more time capturing the reasoning behind each test case in my notes and PR description so the purpose of the coverage work is easier for others to understand.
+
+**What are you most proud of from this module?**
+I am most proud of creating, understanding, fixing some of the previous test and my new test. It was a very fun journey.
